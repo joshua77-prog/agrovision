@@ -131,15 +131,18 @@ export default function LoginPage() {
             {/* Email */}
             <div>
               <label htmlFor="email" className="label">Email address</label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <div className="relative flex items-center">
+                <div className="absolute left-3.5 pointer-events-none text-gray-400 z-10 flex items-center">
+                  <Mail size={18} />
+                </div>
                 <input
                   id="email"
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="you@example.com"
-                  className={`input pl-9 ${errors.email ? 'input-error' : ''}`}
+                  style={{ minHeight: '44px' }}
+                  className={`input input-has-left-icon ${errors.email ? 'input-error' : ''}`}
                   autoComplete="email"
                 />
               </div>
@@ -154,24 +157,27 @@ export default function LoginPage() {
                   Forgot password?
                 </a>
               </div>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <div className="relative flex items-center">
+                <div className="absolute left-3.5 pointer-events-none text-gray-400 z-10 flex items-center">
+                  <Lock size={18} />
+                </div>
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   placeholder="••••••••"
-                  className={`input pl-9 pr-10 ${errors.password ? 'input-error' : ''}`}
+                  style={{ minHeight: '44px' }}
+                  className={`input input-has-left-icon input-has-right-icon ${errors.password ? 'input-error' : ''}`}
                   autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3.5 text-gray-400 hover:text-gray-700 transition-colors z-10 p-1 flex items-center"
                   aria-label="Toggle password visibility"
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
               {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}

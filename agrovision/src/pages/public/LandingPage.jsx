@@ -8,6 +8,9 @@ import {
 } from 'lucide-react';
 import Logo from '../../components/layout/Logo';
 import Button from '../../components/ui/Button';
+import tomatoSample from '../../assets/samples/tomato-early-blight.jpg';
+import cornSample from '../../assets/samples/corn-rust.jpg';
+import wheatSample from '../../assets/samples/wheat-healthy.jpg';
 
 // ─── Navbar ────────────────────────────────────────────────
 function LandingNav() {
@@ -47,7 +50,7 @@ const SAMPLE_DISEASE_SCANS = [
     severity: 'Moderate',
     remedy: 'Apply Copper Hydroxide or bio-fungicide Bacillus subtilis; prune lower diseased foliage.',
     advisory: 'Wind 8 km/h • Safe spray window active until 11:30 AM.',
-    image: 'https://images.unsplash.com/photo-1592417817098-8f3d6ef23ea9?w=600&auto=format&fit=crop&q=80',
+    image: tomatoSample,
   },
   {
     id: 'corn',
@@ -58,7 +61,7 @@ const SAMPLE_DISEASE_SCANS = [
     severity: 'High',
     remedy: 'Apply strobilurin or triazole fungicide; ensure proper field aeration.',
     advisory: 'Relative humidity 81% • Postpone irrigation to suppress fungal proliferation.',
-    image: 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?w=600&auto=format&fit=crop&q=80',
+    image: cornSample,
   },
   {
     id: 'wheat',
@@ -69,7 +72,7 @@ const SAMPLE_DISEASE_SCANS = [
     severity: 'None',
     remedy: 'Optimal chlorophyll synthesis. Maintain standard nitrogen schedule.',
     advisory: 'Soil moisture adequate • Next scouting recommended in 5 days.',
-    image: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=600&auto=format&fit=crop&q=80',
+    image: wheatSample,
   }
 ];
 
@@ -192,6 +195,14 @@ function Hero() {
                   className={`w-full h-full object-cover transition-opacity duration-300 ${
                     isScanning ? 'opacity-60 filter blur-[1px]' : 'opacity-85'
                   }`}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = activeSample.id === 'tomato'
+                      ? '/samples/tomato-early-blight.jpg'
+                      : activeSample.id === 'corn'
+                      ? '/samples/corn-rust.jpg'
+                      : '/samples/wheat-healthy.jpg';
+                  }}
                 />
 
                 {/* HUD Matrix Grid Overlay */}

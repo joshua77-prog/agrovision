@@ -1,12 +1,15 @@
 import io
 import json
 from pathlib import Path
+import urllib.error
+import urllib.parse
+import urllib.request
 
 import numpy as np
 import onnxruntime as ort
 from PIL import Image
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -61,7 +64,7 @@ session = ort.InferenceSession(
 input_name = session.get_inputs()[0].name
 output_name = session.get_outputs()[0].name
 
-print("✅ Model loaded successfully")
+print("[OK] Model loaded successfully")
 print("Input:", input_name)
 print("Output:", output_name)
 
@@ -87,9 +90,7 @@ with open(
 
 CROP_CLASSES = {
     "Pepper": [0, 1],
-
     "Potato": [2, 3, 4],
-
     "Tomato": [
         5,
         6,
@@ -110,50 +111,21 @@ CROP_CLASSES = {
 # ============================================================
 
 DISPLAY_NAMES = {
-    "Pepper__bell___Bacterial_spot":
-        "Bacterial Spot",
-
-    "Pepper__bell___healthy":
-        "Healthy",
-
-    "Potato___Early_blight":
-        "Early Blight",
-
-    "Potato___Late_blight":
-        "Late Blight",
-
-    "Potato___healthy":
-        "Healthy",
-
-    "Tomato_Bacterial_spot":
-        "Bacterial Spot",
-
-    "Tomato_Early_blight":
-        "Early Blight",
-
-    "Tomato_Late_blight":
-        "Late Blight",
-
-    "Tomato_Leaf_Mold":
-        "Leaf Mold",
-
-    "Tomato_Septoria_leaf_spot":
-        "Septoria Leaf Spot",
-
-    "Tomato_Spider_mites_Two_spotted_spider_mite":
-        "Spider Mites",
-
-    "Tomato__Target_Spot":
-        "Target Spot",
-
-    "Tomato__Tomato_YellowLeaf__Curl_Virus":
-        "Tomato Yellow Leaf Curl Virus",
-
-    "Tomato__Tomato_mosaic_virus":
-        "Tomato Mosaic Virus",
-
-    "Tomato_healthy":
-        "Healthy",
+    "Pepper__bell___Bacterial_spot": "Bacterial Spot",
+    "Pepper__bell___healthy": "Healthy",
+    "Potato___Early_blight": "Early Blight",
+    "Potato___Late_blight": "Late Blight",
+    "Potato___healthy": "Healthy",
+    "Tomato_Bacterial_spot": "Bacterial Spot",
+    "Tomato_Early_blight": "Early Blight",
+    "Tomato_Late_blight": "Late Blight",
+    "Tomato_Leaf_Mold": "Leaf Mold",
+    "Tomato_Septoria_leaf_spot": "Septoria Leaf Spot",
+    "Tomato_Spider_mites_Two_spotted_spider_mite": "Spider Mites",
+    "Tomato__Target_Spot": "Target Spot",
+    "Tomato__Tomato_YellowLeaf__Curl_Virus": "Tomato Yellow Leaf Curl Virus",
+    "Tomato__Tomato_mosaic_virus": "Tomato Mosaic Virus",
+    "Tomato_healthy": "Healthy",
 }
 
 
@@ -162,7 +134,6 @@ DISPLAY_NAMES = {
 # ============================================================
 
 def normalize_crop(crop: str):
-
     if not crop:
         return None
 
@@ -190,7 +161,6 @@ def normalize_crop(crop: str):
 # ============================================================
 
 def get_display_name(class_name):
-
     return DISPLAY_NAMES.get(
         class_name,
         class_name,
@@ -203,11 +173,69 @@ def get_display_name(class_name):
 
 @app.get("/")
 def home():
-
     return {
         "message": "AgroVision ML API is running",
         "model": "EfficientNetV2-B0",
         "classes": 15,
+    }
+
+
+# ============================================================
+# WEATHER ENDPOINT
+# ============================================================
+
+@app.get("/weather")
+def get_weather(
+    latitude: float = Query(..., ge=-90, le=90),
+    longitude: float = Query(..., ge=-180, le=180),
+):
+    """Fetch current weather for the supplied coordinates from Open-Meteo."""
+
+    query = urllib.parse.urlencode(
+        {
+            "latitude": latitude,
+            "longitude": longitude,
+            "current": (
+                "temperature_2m,relative_humidity_2m,"
+                "precipitation,rain,showers,snowfall,"
+                "weather_code,wind_speed_10m"
+            ),
+            "timezone": "auto",
+        }
+    )
+    url = f"https://api.open-meteo.com/v1/forecast?{query}"
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "AgroVision/1.0"},
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            weather_data = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Open-Meteo returned HTTP {error.code}.",
+        )
+    except (urllib.error.URLError, TimeoutError):
+        raise HTTPException(
+            status_code=502,
+            detail="Could not connect to the Open-Meteo weather service.",
+        )
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=502,
+            detail="Open-Meteo returned an invalid response.",
+        )
+
+    return {
+        "success": True,
+        "source": "Open-Meteo",
+        "latitude": weather_data.get("latitude"),
+        "longitude": weather_data.get("longitude"),
+        "timezone": weather_data.get("timezone"),
+        "current": weather_data.get("current"),
+        "current_units": weather_data.get("current_units"),
     }
 
 
@@ -220,13 +248,11 @@ async def predict(
     file: UploadFile = File(...),
     crop: str = Form(...),
 ):
-
     print("\n-----------------------------------")
     print("New AgroVision prediction request")
     print("Filename:", file.filename)
     print("Content type:", file.content_type)
     print("Crop received:", repr(crop))
-
 
     # ========================================================
     # 1. VALIDATE CROP
@@ -237,7 +263,6 @@ async def predict(
     print("Normalized crop:", selected_crop)
 
     if selected_crop is None:
-
         return {
             "success": False,
             "error": (
@@ -245,7 +270,6 @@ async def predict(
                 "Please select Tomato, Potato, or Pepper."
             ),
         }
-
 
     # ========================================================
     # 2. VALIDATE IMAGE TYPE
@@ -255,7 +279,6 @@ async def predict(
         not file.content_type
         or not file.content_type.startswith("image/")
     ):
-
         return {
             "success": False,
             "error": (
@@ -264,7 +287,6 @@ async def predict(
             ),
         }
 
-
     # ========================================================
     # 3. READ IMAGE BYTES
     # ========================================================
@@ -272,19 +294,16 @@ async def predict(
     image_bytes = await file.read()
 
     if not image_bytes:
-
         return {
             "success": False,
             "error": "The uploaded image is empty.",
         }
-
 
     # ========================================================
     # 4. DECODE IMAGE USING PILLOW
     # ========================================================
 
     try:
-
         pil_image = Image.open(
             io.BytesIO(image_bytes)
         )
@@ -292,7 +311,6 @@ async def predict(
         pil_image = pil_image.convert("RGB")
 
     except Exception as error:
-
         print("Image decoding error:", error)
 
         return {
@@ -304,7 +322,6 @@ async def predict(
             ),
         }
 
-
     # ========================================================
     # 5. RESIZE TO MODEL INPUT
     # ========================================================
@@ -313,7 +330,6 @@ async def predict(
         (224, 224),
         Image.Resampling.LANCZOS,
     )
-
 
     # ========================================================
     # 6. CONVERT TO NUMPY
@@ -324,7 +340,6 @@ async def predict(
         dtype=np.float32,
     )
 
-
     # ========================================================
     # 7. ADD BATCH DIMENSION
     # ========================================================
@@ -334,16 +349,13 @@ async def predict(
         axis=0,
     )
 
-
     print("Image shape:", image.shape)
-
 
     # ========================================================
     # 8. MODEL INFERENCE
     # ========================================================
 
     try:
-
         predictions = session.run(
             [output_name],
             {
@@ -352,7 +364,6 @@ async def predict(
         )[0][0]
 
     except Exception as error:
-
         print("Model inference error:", error)
 
         return {
@@ -362,7 +373,6 @@ async def predict(
                 "could not process this image."
             ),
         }
-
 
     # ========================================================
     # 9. GLOBAL MODEL PREDICTION
@@ -384,7 +394,6 @@ async def predict(
         global_class
     )
 
-
     # ========================================================
     # 10. GET CLASSES FOR SELECTED CROP
     # ========================================================
@@ -392,7 +401,6 @@ async def predict(
     allowed_classes = CROP_CLASSES[
         selected_crop
     ]
-
 
     # ========================================================
     # 11. CROP-ONLY SCORES
@@ -402,7 +410,6 @@ async def predict(
         index: float(predictions[index])
         for index in allowed_classes
     }
-
 
     # ========================================================
     # 12. BEST CLASS WITHIN SELECTED CROP
@@ -417,7 +424,6 @@ async def predict(
         crop_scores[selected_class_index]
     )
 
-
     # ========================================================
     # 13. CROP PROBABILITY MASS
     # ========================================================
@@ -426,22 +432,17 @@ async def predict(
         crop_scores.values()
     )
 
-
     # ========================================================
     # 14. CROP-RELATIVE CONFIDENCE
     # ========================================================
 
     if crop_probability_mass > 0:
-
         crop_relative_confidence = (
             selected_raw_probability /
             crop_probability_mass
         )
-
     else:
-
         crop_relative_confidence = 0.0
-
 
     # ========================================================
     # 15. SELECTED DISEASE
@@ -455,7 +456,6 @@ async def predict(
         selected_class
     )
 
-
     # ========================================================
     # 16. HEALTH CHECK
     # ========================================================
@@ -464,7 +464,6 @@ async def predict(
         "healthy" in selected_class.lower()
     )
 
-
     # ========================================================
     # 17. CHECK GLOBAL VS SELECTED CROP
     # ========================================================
@@ -472,7 +471,6 @@ async def predict(
     global_matches_crop = (
         global_index in allowed_classes
     )
-
 
     # ========================================================
     # 18. RELIABILITY
@@ -487,7 +485,6 @@ async def predict(
         selected_raw_probability >= 0.50
     )
 
-
     # ========================================================
     # 19. WARNING MESSAGE
     # ========================================================
@@ -495,7 +492,6 @@ async def predict(
     warning = None
 
     if not global_matches_crop:
-
         warning = (
             f"The model's strongest overall prediction "
             f"was {global_display_name}, but the selected "
@@ -505,7 +501,6 @@ async def predict(
         )
 
     elif not prediction_reliable:
-
         warning = (
             f"The model has low confidence for this "
             f"{selected_crop} image. "
@@ -513,23 +508,18 @@ async def predict(
             f"for a more reliable prediction."
         )
 
-
     # ========================================================
     # 20. DISPLAY NAME FOR LOW-CONFIDENCE RESULT
     # ========================================================
 
     if prediction_reliable:
-
         final_display_name = (
             selected_display_name
         )
-
     else:
-
         final_display_name = (
             f"Possible {selected_display_name}"
         )
-
 
     # ========================================================
     # 21. LOG RESULT
@@ -592,13 +582,11 @@ async def predict(
 
     print("===================================\n")
 
-
     # ========================================================
     # 22. RETURN RESPONSE
     # ========================================================
 
     return {
-
         "success": True,
 
         "disease":
