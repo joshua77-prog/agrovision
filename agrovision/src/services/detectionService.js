@@ -43,10 +43,12 @@ export async function analyzeImage(imageFile, crop) {
   formData.append('file', imageFile);
   formData.append('crop', crop);
 
+  const mlBaseUrl = (import.meta.env.VITE_ML_API_URL || 'http://127.0.0.1:8001').replace(/\/+$/, '');
+
   try {
 
     const response = await fetch(
-      'http://127.0.0.1:8001/predict',
+      `${mlBaseUrl}/predict`,
       {
         method: 'POST',
         body: formData,
